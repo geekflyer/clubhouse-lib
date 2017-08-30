@@ -1,4 +1,28 @@
-import ClientError from './client_error';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+
+export {
+  Project,
+  ProjectChange,
+  Story,
+  StoryChange,
+  Member,
+  Epic,
+  EpicChange,
+  StoryComment,
+  Task,
+  TaskChange,
+  Workflow,
+  StoryLinkChange,
+  StoryLink,
+  File,
+  FileChange,
+  LinkedFile,
+  LinkedFileChange,
+  RequestFactory,
+  ID,
+  Label,
+  StoryType
+} from './types';
 
 import {
   Project,
@@ -20,43 +44,54 @@ import {
   LinkedFileChange,
   RequestFactory,
   ID,
+  Label,
+  StoryType
 } from './types';
-
-require('fetch-everywhere');
 
 const API_BASE_URL: string = 'https://api.clubhouse.io';
 const API_VERSION: string = 'beta';
 
-const parseResponse = (response: Response): Promise<any> =>
-  response.json().then((json: Object) => {
-    if (response.ok) {
-      return json;
-    }
-
-    return Promise.reject(new ClientError(response, json));
-  });
+const parseResponse = (response: AxiosResponse): Promise<any> => {
+  return response.data;
+};
 
 class TokenRequestFactory implements RequestFactory {
-  token: string;
+
+  private axios: AxiosInstance;
 
   constructor(token: string) {
-    this.token = token;
+    this.axios = axios.create({
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json; charset=utf-8'
+      },
+      params: {
+        token: token
+      }
+    })
   }
 
-  makeRequest(url: string, method: string = 'GET', body?: object): Promise<any> {
-    const urlWithToken = `${url}?token=${this.token}`;
-    const headers = {
-      Accept: 'application/json',
-      'Content-Type': 'application/json; charset=utf-8',
-    };
-
-    return fetch(urlWithToken, {
-      body: JSON.stringify(body),
-      headers,
-      method,
-    });
+  async makeRequest(url: string, method: string = 'GET', data?: object): Promise<any> {
+    // while loop is used for transparent retry when rate limit reached.
+    while (true) {
+      try {
+        return await this.axios.request({
+          url,
+          data,
+          method
+        });
+      } catch (e) {
+        if (e && e.response && e.response.status === 429) {
+          console.warn(`clubhouse.io api rate limit reached while calling: ${e.config.method} ${e.config.url} - Retrying in 60 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 60000));
+        } else {
+          throw e;
+        }
+      }
+    }
   }
 }
+
 /** */
 export type ClientConfig = {
   baseURL: string,
@@ -106,10 +141,11 @@ export default class Client {
   createResource<ResponseType>(
     uri: string,
     params: Object,
+    otherOptions?: AxiosRequestConfig
   ): Promise<ResponseType> {
     const URL = this.generateUrl(uri);
     return this.requestFactory
-      .makeRequest(URL, 'POST', params)
+      .makeRequest(URL, 'POST', params, otherOptions)
       .then(parseResponse);
   }
 
@@ -254,7 +290,7 @@ export default class Client {
   }
 
   /** */
-  createStoryLink(params: StoryLinkChange): Promise<StoryLink> {
+  createStoryLink(params: StoryLink): Promise<StoryLink> {
     return this.createResource('story-links', params);
   }
 
@@ -304,5 +340,22 @@ export default class Client {
   /** */
   deleteLinkedFile(linkedFileID: ID): Promise<{}> {
     return this.deleteResource(`linked-files/${linkedFileID}`);
+  }
+
+  listLabels(): Promise<Label[]> {
+    return this.listResource('labels');
+  }
+
+  /** */
+  deleteLabel(labelId: string|number): Promise<{}> {
+    return this.deleteResource(`labels/${labelId}`);
+  }
+
+  updateLabel(labelId: string|number, updateOpts: {archived?: boolean, color?: string, name?: string}): Promise<{}> {
+    return this.updateResource(`labels/${labelId}`, updateOpts);
+  }
+
+  searchStories(storyQuery: object): Promise<Story[]> {
+    return this.createResource('stories/search', storyQuery);
   }
 }

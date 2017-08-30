@@ -7,13 +7,15 @@ export interface Entity {
 }
 
 export interface RequestFactory {
-  makeRequest(uri: string, method?: string, body?: Object): Promise<any>,
+  makeRequest(uri: string, method?: string, body?: Object, other?: any): Promise<any>,
 }
 
 /* Users */
 
 export type Profile = {
   name: string,
+  mention_name: string,
+  email_address: string
 };
 
 export type Member = {
@@ -46,6 +48,7 @@ export type Project = {
   archied: boolean,
   follower_ids: Array<ID>,
   stats: any,
+  external_id: string;
 };
 
 /*
@@ -79,6 +82,12 @@ export type Label = {
   stats: any,
 };
 
+export enum StoryType {
+  Bug = 'bug',
+  Chore = 'chore',
+  Feature = 'feature'
+}
+
 /* Storys */
 
 export type Story = {
@@ -88,7 +97,7 @@ export type Story = {
   id: ID,
   external_id: string,
   name: string,
-  story_type: string,
+  story_type: StoryType,
   description: string,
   position: number,
   workflow_state_id: number,
@@ -99,14 +108,16 @@ export type Story = {
   completed_at: string,
   completed_at_override: string,
   blocked: boolean,
-  estimate: boolean,
+  estimate: number,
   deadline: string,
   project_id: number,
-  label: Array<Label>,
+  labels: Array<Label>,
   requested_by_id: ID,
   owner_ids: Array<ID>,
   epic_id: number,
   tasks_id: Array<ID>,
+  story_links: StoryLink[];
+  comments?: Array<StoryComment>
 };
 
 export type StoryChange = {
@@ -126,7 +137,7 @@ export type StoryChange = {
   deadline?: string,
   labels?: Array<Label>,
   file_ids?: Array<ID>,
-  linked_file_ids?: Array<ID>,
+  linked_file_ids?: Array<ID>
 };
 
 /* Epic */
@@ -177,7 +188,7 @@ export type EpicChange = {
 /* StoryComment */
 
 export type StoryComment = {
-  id: ID,
+  id?: ID,
   created_at: string,
   updated_at: string,
 };
@@ -241,7 +252,7 @@ export type StoryLink = {
 
 export type StoryLinkChange = {
   object_id: ID,
-  verb_id: ID,
+  subject_id: ID,
   verb: StoryLinkVerb,
 };
 
@@ -260,6 +271,7 @@ export type File = {
   thumbnail_url: string,
   uploader_id: ID,
   url: string,
+  external_id: string
 };
 
 export type FileChange = {
